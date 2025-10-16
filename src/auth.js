@@ -28,4 +28,6 @@ export const { auth } = CreateAuth({
     signOut: '/account/logout',
   },
   trustHost: true, // Allow any host in production
+  secret: process.env.AUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
 })

@@ -6,6 +6,12 @@ const useUser = () => {
   const [user, setUser] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
+  const [mounted, setMounted] = React.useState(false);
+
+  // Handle hydration
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchUser = React.useCallback(async () => {
     if (!session?.user) {
@@ -55,6 +61,8 @@ const useUser = () => {
   }, [session?.user]);
 
   React.useEffect(() => {
+    if (!mounted) return; // Prevent hydration mismatch
+    
     if (status === "loading") {
       setLoading(true);
       return;
@@ -66,18 +74,18 @@ const useUser = () => {
       setUser(null);
       setLoading(false);
     }
-  }, [status, session?.user, fetchUser]);
+  }, [status, session?.user, fetchUser, mounted]);
 
   const refetch = React.useCallback(() => {
-    if (session?.user) {
+    if (session?.user && mounted) {
       fetchUser();
     }
-  }, [fetchUser, session?.user]);
+  }, [fetchUser, session?.user, mounted]);
 
   return {
     data: session?.user || null,
     user: user,
-    loading: status === "loading" || loading,
+    loading: !mounted || status === "loading" || loading,
     error: error,
     refetch: refetch,
   };
