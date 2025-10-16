@@ -117,6 +117,7 @@ export async function POST(request) {
       console.error('❌ [OTP SEND] sendSMS failed:', e);
       console.error('❌ [OTP SEND] Error details:', e.message);
       console.error('❌ [OTP SEND] Error stack:', e.stack);
+      
       // Try to cleanup database, but don't fail if database is unavailable
       console.log('🧹 [OTP SEND] Attempting database cleanup...');
       try {
@@ -125,7 +126,27 @@ export async function POST(request) {
       } catch (dbError) {
         console.warn('⚠️ [OTP SEND] Database cleanup failed:', dbError.message);
       }
-      return Response.json({ error: 'ارسال پیامک ناموفق بود' }, { status: 500 });
+      
+      // Return more specific error messages for debugging
+      let errorMessage = 'ارسال پیامک ناموفق بود';
+      if (e.message.includes('SMS_API_KEY')) {
+        errorMessage = 'خطای پیکربندی SMS: کلید API تنظیم نشده است';
+      } else if (e.message.includes('SMS_SENDER')) {
+        errorMessage = 'خطای پیکربندی SMS: شماره خط تنظیم نشده است';
+      } else if (e.message.includes('SMS_DRIVER')) {
+        errorMessage = 'خطای پیکربندی SMS: درایور SMS تنظیم نشده است';
+      }
+      
+      return Response.json({ 
+        error: errorMessage,
+        debug: {
+          message: e.message,
+          driver: process.env.SMS_DRIVER,
+          hasApiKey: !!process.env.SMS_API_KEY,
+          hasSender: !!process.env.SMS_SENDER,
+          nodeEnv: process.env.NODE_ENV
+        }
+      }, { status: 500 });
     }
 
     console.log('🎉 [OTP SEND] Success! Preparing response...');

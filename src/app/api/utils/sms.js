@@ -34,9 +34,10 @@ export async function sendSMS(receptor, code, opts = {}) {
   // Check if we're using SMS.ir driver
   const driver = process.env.SMS_DRIVER;
   console.log('🔧 [SMS] SMS_DRIVER:', driver);
+  
   if (driver !== 'smsir') {
-    console.warn('⚠️ [SMS] SMS_DRIVER is not set to "smsir". Current driver:', driver);
-    throw new Error('SMS_DRIVER must be set to "smsir"');
+    console.error('❌ [SMS] SMS_DRIVER is not set to "smsir". Current driver:', driver);
+    throw new Error(`SMS_DRIVER must be set to "smsir" for production. Current: ${driver}`);
   }
 
   // Validate required environment variables
@@ -46,17 +47,18 @@ export async function sendSMS(receptor, code, opts = {}) {
   
   console.log('🔑 [SMS] Environment variables:', { 
     apiKey: apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET',
-    lineNumber: lineNumber || 'NOT SET'
+    lineNumber: lineNumber || 'NOT SET',
+    nodeEnv: process.env.NODE_ENV || 'NOT SET'
   });
 
   if (!apiKey) {
     console.error('❌ [SMS] SMS_API_KEY is not defined');
-    throw new Error('SMS_API_KEY is required');
+    throw new Error('SMS_API_KEY is required for SMS.ir integration');
   }
 
   if (!lineNumber) {
     console.error('❌ [SMS] SMS_SENDER is not defined');
-    throw new Error('SMS_SENDER is required');
+    throw new Error('SMS_SENDER (line number) is required for SMS.ir integration');
   }
 
   // Normalize phone number
