@@ -1,0 +1,27 @@
+### Messages
+POST http://localhost:4000/api/messages
+Content-Type: application/json
+
+{
+  "content": "سلام",
+  "panelType": "TOP_STUDENTS"
+}
+
+### List approved messages
+GET http://localhost:4000/api/messages?panel=top
+
+### Approve message (admin)
+POST http://localhost:4000/api/admin/messages/MSG_ID/approve
+
+### Challenges
+GET http://localhost:4000/api/challenges/active
+POST http://localhost:4000/api/challenges/CH_ID/participate
+GET http://localhost:4000/api/challenges/leaderboard
+
+### Settings toggle (admin)
+POST http://localhost:4000/api/admin/settings/toggle-family-chat
+
+### Cron runner (admin)
+GET http://localhost:4000/api/admin/cron/run?task=dailyReminder
+GET http://localhost:4000/api/admin/cron/run?task=autoSuspension
+

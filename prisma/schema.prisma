@@ -1,0 +1,276 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ===== ENUMS =====
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ReportStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PanelType {
+  TOP_STUDENTS
+  FAMILY_CHAT
+}
+
+// ===== MAIN MODELS =====
+
+model User {
+  id                String    @id @default(cuid()) @map("_id")
+  name              String?
+  phone             String    @unique
+  password          String
+  role              Role      @default(STUDENT)
+  grade             String?
+  field             String?
+  city              String?
+  profileImageUrl   String?
+  accessSuspendedAt DateTime?
+  phoneVerifiedAt   DateTime?
+  isVerified        Boolean   @default(false)
+  status            UserStatus @default(ACTIVE)
+  lastLogin         DateTime?
+  createdAt         DateTime  @default(now())
+  
+  // Admin-specific fields
+  bio               String?   // بیوگرافی/کامنت مدیر
+  officeAddress     String?   // آدرس دفتر مشاور
+  landlinePhone     String?   // شماره تماس ثابت
+  pinned            Boolean   @default(false) // نمایش در لیست اعضای ویژه
+
+  // OTP security fields
+  otpSentAt         DateTime? // Tracks the timestamp of the last sent OTP
+  otpAttempts       Int       @default(0) // Counts consecutive resend attempts
+  otpBlockedUntil   DateTime? // If set, the user is blocked until this time
+
+  // Relations
+  reports           Report[]
+  feedbacks         Feedback[]
+  challengeParticipations ChallengeParticipation[]
+  videos            Video[]
+  videoLikes        VideoLike[]
+  messages          Message[]
+  chatMessagesSent  ChatMessage[] @relation("ChatMessagesSent")
+  chatMessagesReceived ChatMessage[] @relation("ChatMessagesReceived")
+  notifications     Notification[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id         String   @id @default(cuid()) @map("_id")
+  phone      String
+  code       String
+  purpose    String   @default("signup")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  isUsed     Boolean  @default(false)
+  attempts   Int      @default(0)
+
+  @@map("otp_codes")
+}
+
+model Report {
+  id                   String      @id @default(cuid()) @map("_id")
+  date                 DateTime
+  subject              String
+  testSource           String
+  testCount            Int
+  studyDurationMinutes Int
+  description          String?
+  fileUrl              String?
+  status               ReportStatus @default(PENDING)
+  createdAt            DateTime    @default(now())
+  
+  studentId            String
+  student              User        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feedback             Feedback?
+
+  @@map("reports")
+}
+
+model Feedback {
+  id        String   @id @default(cuid()) @map("_id")
+  content   String
+  createdAt DateTime @default(now())
+  
+  reportId  String   @unique
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("feedbacks")
+}
+
+model Challenge {
+  id          String   @id @default(cuid()) @map("_id")
+  title       String
+  description String
+  isActive    Boolean  @default(true)
+  startDate   DateTime
+  endDate     DateTime
+  
+  participations ChallengeParticipation[]
+
+  @@map("challenges")
+}
+
+model ChallengeParticipation {
+  id          String    @id @default(cuid()) @map("_id")
+  date        DateTime  @default(now())
+  
+  studentId   String
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, challengeId, date])
+  @@map("challenge_participations")
+}
+
+model Video {
+  id                 String      @id @default(cuid()) @map("_id")
+  title              String
+  category           String
+  videoUrl           String
+  thumbnailUrl       String?
+  videoTitle         String?
+  videoDescription   String?
+  views              Int         @default(0)
+  createdAt          DateTime    @default(now())
+
+  uploadedById       String
+  uploadedBy         User        @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  likes              VideoLike[]
+
+  @@map("videos")
+}
+
+model VideoLike {
+  id        String   @id @default(cuid()) @map("_id")
+  createdAt DateTime @default(now())
+
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@map("video_likes")
+}
+
+model Message {
+  id          String    @id @default(cuid()) @map("_id")
+  content     String
+  panelType   PanelType
+  isApproved  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  
+  senderId    String
+  sender      User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model ChatMessage {
+  id                String    @id @default(cuid()) @map("_id")
+  content           String
+  type              String    @default("public") // "public" | "private"
+  
+  senderId          String
+  senderName        String?
+  senderRole        String?
+  senderAvatarUrl   String?
+  
+  privateToUserId   String?
+  containsProfanity Boolean   @default(false)
+  
+  status            String    @default("visible") // "visible" | "hidden"
+  deletedBy         String?
+  deletedAt         DateTime?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  sender            User      @relation("ChatMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  privateTo         User?     @relation("ChatMessagesReceived", fields: [privateToUserId], references: [id], onDelete: SetNull)
+
+  @@map("chat_messages")
+}
+
+model Profanity {
+  id        String   @id @default(cuid()) @map("_id")
+  word      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("profanities")
+}
+
+model GuestMessage {
+  id          String   @id @default(cuid()) @map("_id")
+  senderPhone String
+  body        String
+  status      String   @default("new") // "new", "read", "archived"
+  createdAt   DateTime @default(now())
+
+  @@map("guest_messages")
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid()) @map("_id")
+  phone     String   @unique
+  otpHash   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("otp_verifications")
+}
+
+model AdminSettings {
+  id             String   @id @default(cuid()) @map("_id")
+  allowGuestChat Boolean  @default(true)
+  blockedPhones  String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("admin_settings")
+}
+
+model Notification {
+  id          String    @id @default(cuid()) @map("_id")
+  recipientId String
+  content     String
+  type        String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  recipient   User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AppSetting {
+  key   String @id @map("_id")
+  value String
+
+  @@map("app_settings")
+}

@@ -1,0 +1,70 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Development files
+.env.local
+.env.development
+.env.test
+*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+*.test.js
+*.spec.js
+__tests__
+test
+
+# Logs
+logs
+*.log
+
+# Temporary files
+*.tmp
+.cache
+.temp
+
+# Git
+.git
+.gitignore
+
+# Documentation (optional, but keeps deployment lean)
+*.md
+docs
+
+# Scripts that aren't needed in production
+scripts/e2e-*.js
+scripts/test-*.js
+scripts/verify-*.js
+scripts/ws-smoke-test.js
+scripts/curl-snippets.http
+
+# Prisma development files (migrations are applied separately)
+prisma/migrations
+
+# Build artifacts from previous builds (Vercel builds fresh)
+.next
+dist
+out
+
+# But DON'T ignore these critical paths:
+# !build/
+# !public/
+# !src/
+
+

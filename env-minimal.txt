@@ -1,0 +1,35 @@
+# ===========================================
+# MINIMAL SMS.IR CONFIGURATION
+# ===========================================
+
+# Database Configuration (MongoDB)
+DATABASE_URL="mongodb://localhost:27017/khanom_sangshekan_db"
+
+# Authentication Secret (JWT)
+AUTH_SECRET="a77e39cb033c5df2c60477b82b2463b13643119e37fbf6e8b01a69c7e97dae0e"
+
+# ===========================================
+# SMS.IR CONFIGURATION
+# ===========================================
+
+# SMS Driver (must be 'smsir' for SMS.ir integration)
+SMS_DRIVER=smsir
+
+# SMS.ir API Key
+SMS_API_KEY=hh1JYOjBbqjYGPEfwO5ZIm6d2quwfzbM3dMl6xVzaqdhaKp7
+
+# SMS.ir Line Number
+SMS_SENDER=3000419566
+
+# SMS.ir Template ID
+SMS_TEMPLATE_NAME=123456
+
+# ===========================================
+# DEVELOPMENT/TESTING MODES
+# ===========================================
+
+# Mock Mode: Set to 'true' to skip real SMS sending (for testing)
+SMS_MOCK_MODE=true
+
+# Echo Mode: Set to 'true' to display OTP codes in console (for testing)
+TEST_ECHO_OTP=true

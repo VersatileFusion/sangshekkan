@@ -1,0 +1,67 @@
+# ===========================================
+# ESSENTIAL CONFIGURATION FOR SMS.IR OTP
+# ===========================================
+
+# Database Configuration
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/khanom_sangshekan_db?schema=public"
+
+# Authentication Secret (JWT)
+AUTH_SECRET="a77e39cb033c5df2c60477b82b2463b13643119e37fbf6e8b01a69c7e97dae0e"
+
+# ===========================================
+# SMS.IR CONFIGURATION
+# ===========================================
+
+# SMS Driver (must be 'smsir' for SMS.ir integration)
+SMS_DRIVER=smsir
+
+# SMS.ir API Key (your provided key)
+SMS_API_KEY=hh1JYOjBbqjYGPEfwO5ZIm6d2quwfzbM3dMl6xVzaqdhaKp7
+
+# SMS.ir Line Number (your provided sender number)
+SMS_SENDER=3000419566
+
+# SMS.ir Template ID (your provided template)
+SMS_TEMPLATE_NAME=123456
+
+# ===========================================
+# DEVELOPMENT/TESTING MODES
+# ===========================================
+
+# Mock Mode: Set to 'true' to skip real SMS sending (for testing)
+SMS_MOCK_MODE=true
+
+# Echo Mode: Set to 'true' to display OTP codes in console (for testing)
+TEST_ECHO_OTP=true
+
+# ===========================================
+# ADMIN CONFIGURATION
+# ===========================================
+
+# Admin Setup Secret (for creating admin accounts)
+ADMIN_SETUP_SECRET=sadra_secret_key_123
+
+# Default Advisor Password
+DEFAULT_ADVISOR_PASSWORD=Admin@2024Strong
+
+# ===========================================
+# APPLICATION SETTINGS
+# ===========================================
+
+# Asset Base URL (for file uploads)
+ASSET_PUBLIC_BASE_URL=http://localhost:4000/assets
+
+# User Suspension Duration (days)
+SUSPEND_DURATION_DAYS=7
+
+# Family Chat Feature
+FAMILY_CHAT_ENABLED=true
+
+# ===========================================
+# OPTIONAL: FILE STORAGE (R2/CloudFlare)
+# ===========================================
+# Uncomment and configure if you need file storage
+# R2_ACCESS_KEY_ID=your_r2_access_key
+# R2_SECRET_ACCESS_KEY=your_r2_secret_key
+# R2_BUCKET=your_bucket_name
+# R2_ENDPOINT=https://your_account_id.r2.cloudflarestorage.com

@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model User {
+  id                String    @id @map("_id") @db.ObjectId
+  name              String?
+  phone             String    @unique
+  password          String
+  role              Role      @default(STUDENT)
+  grade             String?
+  field             String?
+  city              String?
+  profileImageUrl   String?
+  accessSuspendedAt DateTime?
+  phoneVerifiedAt   DateTime?
+  isVerified        Boolean   @default(false)
+  status            UserStatus @default(ACTIVE)
+  lastLogin         DateTime?
+  createdAt         DateTime  @default(now())
+  
+  // Admin-specific fields
+  bio               String?   // بیوگرافی/کامنت مدیر
+  officeAddress     String?   // آدرس دفتر مشاور
+  landlinePhone     String?   // شماره تماس ثابت
+  pinned            Boolean   @default(false) // نمایش در لیست اعضای ویژه
+
+  // OTP security fields
+  otpSentAt         DateTime? // Tracks the timestamp of the last sent OTP
+  otpAttempts       Int       @default(0) // Counts consecutive resend attempts
+  otpBlockedUntil   DateTime? // If set, the user is blocked until this time
+
+  @@map("users")
+}
+
+model OtpCode {
+  id         String   @id @map("_id") @db.ObjectId
+  phone      String
+  code       String
+  purpose    String   @default("signup")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  isUsed     Boolean  @default(false)
+  attempts   Int      @default(0)
+
+  @@map("otp_codes")
+}
