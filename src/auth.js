@@ -27,4 +27,5 @@ export const { auth } = CreateAuth({
     signIn: '/account/signin',
     signOut: '/account/logout',
   },
+  trustHost: true, // Allow any host in production
 })

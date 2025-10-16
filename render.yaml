@@ -12,6 +12,8 @@ services:
         sync: false
       - key: AUTH_SECRET
         sync: false
+      - key: AUTH_URL
+        sync: false
       - key: SMS_DRIVER
         value: smsir
       - key: SMS_API_KEY

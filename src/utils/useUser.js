@@ -22,7 +22,7 @@ const useUser = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      const response = await fetch("/api/users", {
+      const response = await fetch("/api/users/me", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
