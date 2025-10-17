@@ -21,7 +21,6 @@
 		"@emotion/react": "^11.13.5",
 		"@emotion/styled": "^11.13.5",
 		"@hono/node-server": "^1.14.1",
-		"@hono/react": "^0.1.0",
 		"@hono/swagger-ui": "^0.4.4",
 		"@react-router/dev": "^1.27.2",
 		"@react-router/node": "^1.27.2",
