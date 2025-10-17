@@ -21,7 +21,28 @@ export const { auth } = CreateAuth({
   })],
   session: {
     strategy: 'jwt',
-    maxAge: 2 * 24 * 60 * 60, // 2 days in seconds
+    maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
+  },
+  callbacks: {
+    session({ session, token }) {
+      if (token.sub) {
+        session.user.id = token.sub;
+      }
+      if (token.role) {
+        session.user.role = token.role;
+      }
+      if (token.phone) {
+        session.user.phone = token.phone;
+      }
+      return session;
+    },
+    jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+        token.phone = user.phone;
+      }
+      return token;
+    },
   },
   pages: {
     signIn: '/account/signin',

@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeOff, UserPlus, Mail, MapPin, Phone, Send, CheckCircle, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function SignUpPage() {
+  const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -210,6 +212,9 @@ export default function SignUpPage() {
 
       // Auto-login successful, redirect to dashboard
       console.log('[Registration] Auto-login successful, redirecting to:', data?.nextUrl || '/student-dashboard');
+      
+      // Force session refresh by reloading the page
+      // This ensures the session provider picks up the new cookie
       setTimeout(() => {
         window.location.href = data?.nextUrl || '/student-dashboard';
       }, 1000);

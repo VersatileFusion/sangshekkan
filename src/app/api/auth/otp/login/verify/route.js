@@ -13,9 +13,16 @@ export async function POST(request) {
 
     const { phone, code } = await request.json();
     const rawPhone = String(phone || '').trim().replace(/[\s-]/g, '');
-    if (!rawPhone || !code) return Response.json({ error: 'شماره و کد الزامی است' }, { status: 400 });
+    
+    console.log('[OTP Login Verify] Request data:', { phone: rawPhone, codeLength: code?.length });
+    
+    if (!rawPhone || !code) {
+      console.log('[OTP Login Verify] Missing phone or code');
+      return Response.json({ error: 'شماره و کد الزامی است' }, { status: 400 });
+    }
 
     const normalizedPhone = normalizeIranPhone(rawPhone);
+    console.log('[OTP Login Verify] Normalized phone:', normalizedPhone);
 
     // Find valid OTP
     const otp = await prisma.otpCode.findFirst({
@@ -29,7 +36,10 @@ export async function POST(request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!otp) return Response.json({ error: 'کد نامعتبر یا منقضی شده است' }, { status: 400 });
+    if (!otp) {
+      console.log('[OTP Login Verify] No valid OTP found for:', normalizedPhone);
+      return Response.json({ error: 'کد نامعتبر یا منقضی شده است' }, { status: 400 });
+    }
 
     // Check attempts limit
     if (otp.attempts >= 3) {
@@ -55,8 +65,11 @@ export async function POST(request) {
     });
 
     if (!user) {
+      console.log('[OTP Login Verify] User not found for phone:', normalizedPhone);
       return Response.json({ error: 'کاربر یافت نشد' }, { status: 404 });
     }
+    
+    console.log('[OTP Login Verify] User found:', { id: user.id, name: user.name, role: user.role, status: user.status });
 
     if (user.status === 'SUSPENDED') {
       return Response.json({ 
@@ -108,6 +121,9 @@ export async function POST(request) {
       
       if (isProd) {
         cookieOptions.push('Secure');
+      } else {
+        // Add domain for localhost development
+        cookieOptions.push('Domain=localhost');
       }
 
       const cookieHeader = cookieOptions.join('; ');

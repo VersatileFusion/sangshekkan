@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeOff, CheckCircle, Phone, Send, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useSession } from "@auth/create/react";
 import useAuth from "@/utils/useAuth";
 
 export default function SignInPage() {
+  const navigate = useNavigate();
+  const { update } = useSession();
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [identifier, setIdentifier] = useState(""); // phone or email
@@ -111,6 +115,11 @@ export default function SignInPage() {
         return;
       }
       // Success: redirect based on role
+      console.log('[SignIn] Login successful, redirecting to:', data?.nextUrl || '/');
+      
+      // Force page reload to ensure session cookie is properly processed
+      // The session provider needs a full page reload to detect the new cookie
+      console.log('[SignIn] Using page reload to ensure session detection...');
       window.location.href = data?.nextUrl || '/';
     } catch (err) {
       setError('خطای شبکه/سرور. لطفاً دوباره تلاش کنید.');
@@ -188,9 +197,21 @@ export default function SignInPage() {
         body: JSON.stringify({ phone, code: otp }),
       });
 
-      const data = await response.json();
+      console.log('[SignIn] OTP Login response status:', response.status);
+      
+      let data = {};
+      try {
+        data = await response.json();
+        console.log('[SignIn] OTP Login response data:', data);
+      } catch (jsonError) {
+        console.error('[SignIn] Failed to parse JSON response:', jsonError);
+        setError("خطا در پردازش پاسخ سرور");
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
+        console.log('[SignIn] OTP Login failed with error:', data.error);
         setError(data.error || "ورود ناموفق بود");
         setLoading(false);
         return;
@@ -198,9 +219,16 @@ export default function SignInPage() {
 
       // Success! Redirect based on role
       setSuccessMessage("ورود با موفقیت انجام شد!");
+      console.log('[SignIn] OTP Login successful, redirecting to:', data?.nextUrl || '/');
+      
+      // Force page reload to ensure session cookie is properly processed
+      // The session provider needs a full page reload to detect the new cookie
+      console.log('[SignIn] Using page reload to ensure session detection...');
+      console.log('[SignIn] Cookie should be set, waiting for session provider to process...');
       setTimeout(() => {
+        console.log('[SignIn] Redirecting to:', data?.nextUrl || '/');
         window.location.href = data?.nextUrl || '/';
-      }, 1000);
+      }, 2000); // Increased delay to 2 seconds
 
     } catch (err) {
       console.error("OTP Login error:", err);

@@ -78,7 +78,12 @@ export async function POST(request) {
       "SameSite=Lax",
       `Max-Age=${60 * 60 * 24 * 30}`,
     ];
-    if (isProd) cookieParts.push("Secure");
+    if (isProd) {
+      cookieParts.push("Secure");
+    } else {
+      // Add domain for localhost development
+      cookieParts.push("Domain=localhost");
+    }
     const cookieHeader = cookieParts.join("; ");
 
     const nextUrl = user.role === "ADMIN" ? "/admin" : "/student-dashboard";

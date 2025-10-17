@@ -20,6 +20,9 @@ export default function StudentDashboardLayout({ children, current = 'dashboard'
     // ✅ After loading completes, check authentication
     if (status === 'unauthenticated' || !session?.user) {
       console.log('[StudentDashboard] No session found, redirecting to signin');
+      console.log('[StudentDashboard] Session status:', status);
+      console.log('[StudentDashboard] Session data:', session);
+      console.log('[StudentDashboard] Cookies:', document.cookie);
       navigate('/account/signin', { replace: true });
       return;
     }
@@ -29,10 +32,16 @@ export default function StudentDashboardLayout({ children, current = 'dashboard'
     console.log('[StudentDashboard] Session loaded:', { 
       userId: session.user.id, 
       role, 
-      status 
+      status,
+      fullSession: session
     });
 
-    if (role && role !== 'STUDENT' && role !== 'ADMIN') {
+    // If role is not available in session, try to get it from the user data
+    if (!role) {
+      console.log('[StudentDashboard] Role not found in session, checking user data...');
+      // Role will be handled by the useUser hook, so we'll allow access for now
+      // The dashboard will show appropriate content based on the user's actual role
+    } else if (role !== 'STUDENT' && role !== 'ADMIN') {
       console.log('[StudentDashboard] Invalid role, redirecting to home');
       navigate('/', { replace: true });
       return;

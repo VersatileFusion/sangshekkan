@@ -7,6 +7,305 @@ import { encode as encodeJwt } from '@auth/core/jwt';
 
 const otpRouter = new Hono();
 
+// OTP Login - Send OTP for existing users
+otpRouter.post('/auth/otp/login', async (c) => {
+  console.log('🚀 [OTP LOGIN] Route called - POST /api/auth/otp/login');
+  
+  try {
+    const rl = await rateLimit(c.req.raw, { key: 'otp_login', windowMs: 60_000, limit: 10 });
+    if (rl.error) {
+      console.log('❌ [OTP LOGIN] Rate limit exceeded:', rl.error);
+      return c.json(rl.error.body, rl.error.status as any);
+    }
+
+    const { phone } = await c.req.json();
+    const rawPhone = String(phone || '').trim().replace(/[\s-]/g, '');
+    
+    console.log('📱 [OTP LOGIN] Raw phone from request:', rawPhone);
+    
+    if (!rawPhone) {
+      console.log('❌ [OTP LOGIN] No phone provided');
+      return c.json({ error: 'شماره موبایل الزامی است' }, 400 as any);
+    }
+
+    const phoneRegex = /^(?:\+98|0098|98|0)?9\d{9}$/;
+    if (!phoneRegex.test(rawPhone)) {
+      console.log('❌ [OTP LOGIN] Invalid phone format');
+      return c.json({ error: 'فرمت شماره موبایل معتبر نیست' }, 400 as any);
+    }
+
+    const normalizedPhone = normalizeIranPhone(rawPhone);
+    console.log('📱 [OTP LOGIN] Normalized phone:', normalizedPhone);
+
+    // Check if user exists
+    const existingUser = await prisma.user.findFirst({ 
+      where: { phone: normalizedPhone },
+      select: { id: true, name: true, phone: true, role: true, status: true }
+    });
+    
+    if (!existingUser) {
+      console.log('❌ [OTP LOGIN] User not found for phone:', normalizedPhone);
+      return c.json({ 
+        error: 'این شماره موبایل ثبت‌نام نکرده است. لطفاً ابتدا ثبت‌نام کنید.', 
+        errorCode: 'USER_NOT_FOUND' 
+      }, 404 as any);
+    }
+
+    // Check if user is suspended
+    if (existingUser.status === 'SUSPENDED') {
+      console.log('❌ [OTP LOGIN] User suspended:', existingUser.id);
+      return c.json({ 
+        error: 'حساب کاربری شما مسدود شده است. لطفاً با پشتیبانی تماس بگیرید.' 
+      }, 403 as any);
+    }
+
+    // 2-minute resend window
+    const recent = await prisma.otpCode.findFirst({
+      where: { 
+        phone: normalizedPhone, 
+        purpose: 'login',
+        createdAt: { gte: new Date(Date.now() - 120_000) } 
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    if (recent) {
+      const timeLeft = Math.ceil((recent.createdAt.getTime() + 120_000 - Date.now()) / 1000);
+      console.log('⏰ [OTP LOGIN] Rate limited, time left:', timeLeft);
+      return c.json({ error: `لطفاً ${timeLeft} ثانیه دیگر صبر کنید` }, 429 as any);
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
+    
+    await prisma.otpCode.create({ 
+      data: { 
+        phone: normalizedPhone, 
+        code, 
+        purpose: 'login', 
+        expiresAt 
+      } 
+    });
+
+    console.log('✅ [OTP LOGIN] OTP code created for:', normalizedPhone);
+
+    try {
+      const sent = await sendSMS(normalizedPhone, code, { retries: 2 });
+      
+      if (!sent) {
+        throw new Error('SMS provider returned no success');
+      }
+      
+      console.log('✅ [OTP LOGIN] SMS sent successfully');
+    } catch (e) {
+      console.error('❌ [OTP LOGIN] sendSMS failed:', e);
+      await prisma.otpCode.deleteMany({ 
+        where: { phone: normalizedPhone, code, purpose: 'login' } 
+      });
+      return c.json({ error: 'ارسال پیامک ناموفق بود' }, 500 as any);
+    }
+
+    return c.json({
+      message: 'کد تایید برای ورود ارسال شد',
+      phone: normalizedPhone,
+      expiresIn: 120,
+      ...(process.env.TEST_ECHO_OTP === 'true' ? { debugCode: code } : {})
+    });
+
+  } catch (error) {
+    console.error('❌ [OTP LOGIN] Error:', error);
+    return c.json({ error: 'خطای سرور' }, 500 as any);
+  }
+});
+
+// OTP Login Verification - Verify OTP and login user
+otpRouter.post('/auth/otp/login/verify', async (c) => {
+  console.log('🚀 [OTP LOGIN VERIFY] Route called - POST /api/auth/otp/login/verify');
+  
+  try {
+    const rl = await rateLimit(c.req.raw, { key: 'otp_login_verify', windowMs: 60_000, limit: 10 });
+    if (rl.error) {
+      console.log('❌ [OTP LOGIN VERIFY] Rate limit exceeded:', rl.error);
+      return c.json(rl.error.body, rl.error.status as any);
+    }
+
+    const { phone, code } = await c.req.json();
+    const rawPhone = String(phone || '').trim().replace(/[\s-]/g, '');
+    
+    console.log('📱 [OTP LOGIN VERIFY] Request data:', { phone: rawPhone, codeLength: code?.length });
+    
+    if (!rawPhone || !code) {
+      console.log('❌ [OTP LOGIN VERIFY] Missing phone or code');
+      return c.json({ error: 'شماره و کد الزامی است' }, 400 as any);
+    }
+
+    const normalizedPhone = normalizeIranPhone(rawPhone);
+    console.log('📱 [OTP LOGIN VERIFY] Normalized phone:', normalizedPhone);
+
+    // Find valid OTP
+    const otp = await prisma.otpCode.findFirst({
+      where: { 
+        phone: normalizedPhone, 
+        purpose: 'login', 
+        code, 
+        expiresAt: { gt: new Date() }, 
+        isUsed: false 
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otp) {
+      console.log('❌ [OTP LOGIN VERIFY] No valid OTP found for:', normalizedPhone);
+      return c.json({ error: 'کد نامعتبر یا منقضی شده است' }, 400 as any);
+    }
+
+    // Check attempts limit
+    if (otp.attempts >= 3) {
+      console.log('❌ [OTP LOGIN VERIFY] Too many attempts for OTP:', otp.id);
+      return c.json({ 
+        error: 'تعداد تلاش‌ها بیش از حد مجاز. لطفاً کد جدید درخواست دهید' 
+      }, 429 as any);
+    }
+
+    // Find user
+    const user = await prisma.user.findFirst({ 
+      where: { phone: normalizedPhone },
+      select: { 
+        id: true, 
+        name: true, 
+        phone: true, 
+        role: true, 
+        status: true,
+        grade: true,
+        field: true,
+        city: true,
+        isVerified: true
+      }
+    });
+
+    if (!user) {
+      console.log('❌ [OTP LOGIN VERIFY] User not found for phone:', normalizedPhone);
+      return c.json({ error: 'کاربر یافت نشد' }, 404 as any);
+    }
+    
+    console.log('✅ [OTP LOGIN VERIFY] User found:', { id: user.id, name: user.name, role: user.role, status: user.status });
+
+    if (user.status === 'SUSPENDED') {
+      console.log('❌ [OTP LOGIN VERIFY] User suspended:', user.id);
+      return c.json({ 
+        error: 'حساب کاربری شما مسدود شده است' 
+      }, 403 as any);
+    }
+
+    // Mark OTP as used
+    await prisma.otpCode.update({ 
+      where: { id: otp.id }, 
+      data: { isUsed: true } 
+    });
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
+
+    // Create session token
+    try {
+      const tokenPayload = {
+        sub: user.id,
+        name: user.name ?? null,
+        email: `${user.phone}@local.host`,
+        role: user.role,
+        phone: user.phone,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 30), // 30 days
+      };
+
+      const isProd = process.env.NODE_ENV === 'production';
+      const cookieName = isProd ? '__Secure-authjs.session-token' : 'authjs.session-token';
+      const secret = process.env.AUTH_SECRET || 'development-insecure-auth-secret-change-me';
+      const sessionToken = await encodeJwt({
+        token: tokenPayload,
+        secret,
+        maxAge: 60 * 60 * 24 * 30,
+        salt: cookieName,
+      });
+
+      const cookieOptions = [
+        `${cookieName}=${sessionToken}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Lax',
+        `Max-Age=${60 * 60 * 24 * 30}`,
+      ];
+      
+      if (isProd) {
+        cookieOptions.push('Secure');
+      }
+      
+      // Add domain for localhost development
+      if (!isProd) {
+        cookieOptions.push('Domain=localhost');
+      }
+
+      const cookieHeader = cookieOptions.join('; ');
+
+      console.log('✅ [OTP LOGIN VERIFY] Session created:', {
+        userId: user.id,
+        role: user.role,
+        phone: user.phone,
+      });
+
+      // Determine redirect URL based on role
+      const nextUrl = user.role === 'ADMIN' ? '/admin' : '/student-dashboard';
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'ورود با موفقیت انجام شد',
+        user: {
+          id: user.id,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+          grade: user.grade,
+          field: user.field,
+          city: user.city,
+          isVerified: user.isVerified,
+        },
+        nextUrl,
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': cookieHeader,
+        },
+      });
+    } catch (e) {
+      console.error('❌ [OTP LOGIN VERIFY] Cookie creation failed:', e?.message || e);
+      return c.json({
+        success: true,
+        message: 'ورود با موفقیت انجام شد',
+        user: {
+          id: user.id,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+          grade: user.grade,
+          field: user.field,
+          city: user.city,
+          isVerified: user.isVerified,
+        },
+        nextUrl: user.role === 'ADMIN' ? '/admin' : '/student-dashboard',
+        requireManualLogin: true,
+      }, 200 as any);
+    }
+
+  } catch (error) {
+    console.error('❌ [OTP LOGIN VERIFY] Error:', error);
+    return c.json({ error: 'خطای سرور' }, 500 as any);
+  }
+});
+
 otpRouter.post('/auth/otp/send', async (c) => {
   console.log('🚀 [OTP DIRECT] Route called - POST /api/auth/otp/send');
   

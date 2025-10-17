@@ -158,15 +158,28 @@ if (process.env.AUTH_SECRET) {
     },
     session: {
       strategy: 'jwt',
-      // Require re-login if user was inactive; 2 days expiry
-      maxAge: 60 * 60 * 24 * 2,
+      // Require re-login if user was inactive; 30 days expiry
+      maxAge: 60 * 60 * 24 * 30,
     },
     callbacks: {
       session({ session, token }) {
         if (token.sub) {
           session.user.id = token.sub;
         }
+        if (token.role) {
+          session.user.role = token.role;
+        }
+        if (token.phone) {
+          session.user.phone = token.phone;
+        }
         return session;
+      },
+      jwt({ token, user }) {
+        if (user) {
+          token.role = user.role;
+          token.phone = user.phone;
+        }
+        return token;
       },
     },
     cookies: {
