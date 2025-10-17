@@ -10,4 +10,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: AUTH_TRUST_HOST
+        value: true
+      - key: AUTH_URL
+        value: https://sangshekkan-wi2n.onrender.com
     healthCheckPath: /api/health

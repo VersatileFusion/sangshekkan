@@ -151,6 +151,8 @@ if (process.env.AUTH_SECRET) {
     secret: process.env.AUTH_SECRET,
     // Ensure Auth.js parses actions at our API route
     basePath: '/api/auth',
+    // Trust the Render domain for production
+    trustHost: true,
     // adapter: PrismaAdapter(prisma), // not used; we keep JWT-only
     pages: {
       signIn: '/account/signin',
