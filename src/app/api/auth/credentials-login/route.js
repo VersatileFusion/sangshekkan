@@ -80,8 +80,8 @@ export async function POST(request) {
     ];
     if (isProd) {
       cookieParts.push("Secure");
-    } else {
-      // Add domain for localhost development
+    } else if (process.env.HOST === 'localhost') {
+      // Add domain only for localhost development
       cookieParts.push("Domain=localhost");
     }
     const cookieHeader = cookieParts.join("; ");

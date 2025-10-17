@@ -185,19 +185,19 @@ if (process.env.AUTH_SECRET) {
     cookies: {
       csrfToken: {
         options: {
-          secure: false, // Set to false for localhost
+          secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
         },
       },
       sessionToken: {
         options: {
-          secure: false, // Set to false for localhost
+          secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
         },
       },
       callbackUrl: {
         options: {
-          secure: false, // Set to false for localhost
+          secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
         },
       },

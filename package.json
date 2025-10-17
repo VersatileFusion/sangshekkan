@@ -5,7 +5,7 @@
 	"scripts": {
 		"dev": "react-router dev",
 		"build": "react-router build",
-		"start": "node index.js",
+		"start": "node server.js",
 		"postinstall": "prisma generate",
 		"e2e:otp": "node ./scripts/e2e-otp-signup.js",
 		"typecheck": "react-router typegen && tsc --noEmit",

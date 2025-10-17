@@ -1,32 +1,13 @@
 services:
   - type: web
-    name: sangshekkan-app
+    name: sangshekkan
     env: node
-    plan: free
-    buildCommand: npm install && npm run build
+    plan: starter
+    buildCommand: npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: AUTH_SECRET
-        sync: false
-      - key: AUTH_URL
-        sync: false
-      - key: SMS_DRIVER
-        value: smsir
-      - key: SMS_API_KEY
-        sync: false
-      - key: SMS_SENDER
-        sync: false
-      - key: SMS_TEMPLATE_NAME
-        sync: false
-      - key: SMS_MOCK_MODE
-        value: false
-      - key: TEST_ECHO_OTP
-        value: false
-      - key: SIGNUP_ALERT_MSISDN
-        sync: false
-    healthCheckPath: /api/auth/providers
-    autoDeploy: true
+      - key: PORT
+        value: 10000
+    healthCheckPath: /api/health

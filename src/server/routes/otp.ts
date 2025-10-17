@@ -243,8 +243,8 @@ otpRouter.post('/auth/otp/login/verify', async (c) => {
         cookieOptions.push('Secure');
       }
       
-      // Add domain for localhost development
-      if (!isProd) {
+      // Add domain only for localhost development
+      if (!isProd && process.env.HOST === 'localhost') {
         cookieOptions.push('Domain=localhost');
       }
 
