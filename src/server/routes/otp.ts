@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import prisma from '../../app/api/utils/prisma';
+import { getCollections } from '../../app/api/utils/mongodb';
 import { rateLimit } from '../../app/api/utils/rateLimit';
 import { sendSMS, normalizeIranPhone } from '../../app/api/utils/sms';
 import { hash as argonHash } from 'argon2';
@@ -38,10 +38,8 @@ otpRouter.post('/auth/otp/login', async (c) => {
     console.log('📱 [OTP LOGIN] Normalized phone:', normalizedPhone);
 
     // Check if user exists
-    const existingUser = await prisma.user.findFirst({ 
-      where: { phone: normalizedPhone },
-      select: { id: true, name: true, phone: true, role: true, status: true }
-    });
+    const { users } = await getCollections();
+    const existingUser = await users.findOne({ phone: normalizedPhone });
     
     if (!existingUser) {
       console.log('❌ [OTP LOGIN] User not found for phone:', normalizedPhone);
@@ -53,21 +51,19 @@ otpRouter.post('/auth/otp/login', async (c) => {
 
     // Check if user is suspended
     if (existingUser.status === 'SUSPENDED') {
-      console.log('❌ [OTP LOGIN] User suspended:', existingUser.id);
+      console.log('❌ [OTP LOGIN] User suspended:', existingUser._id);
       return c.json({ 
         error: 'حساب کاربری شما مسدود شده است. لطفاً با پشتیبانی تماس بگیرید.' 
       }, 403 as any);
     }
 
     // 2-minute resend window
-    const recent = await prisma.otpCode.findFirst({
-      where: { 
-        phone: normalizedPhone, 
-        purpose: 'login',
-        createdAt: { gte: new Date(Date.now() - 120_000) } 
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const { otpCodes } = await getCollections();
+    const recent = await otpCodes.findOne({
+      phone: normalizedPhone, 
+      purpose: 'login',
+      createdAt: { $gte: new Date(Date.now() - 120_000) } 
+    }, { sort: { createdAt: -1 } });
     
     if (recent) {
       const timeLeft = Math.ceil((recent.createdAt.getTime() + 120_000 - Date.now()) / 1000);
@@ -78,13 +74,14 @@ otpRouter.post('/auth/otp/login', async (c) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
     
-    await prisma.otpCode.create({ 
-      data: { 
-        phone: normalizedPhone, 
-        code, 
-        purpose: 'login', 
-        expiresAt 
-      } 
+    await otpCodes.insertOne({ 
+      phone: normalizedPhone, 
+      code, 
+      purpose: 'login', 
+      expiresAt,
+      isUsed: false,
+      attempts: 0,
+      createdAt: new Date()
     });
 
     console.log('✅ [OTP LOGIN] OTP code created for:', normalizedPhone);
@@ -99,8 +96,8 @@ otpRouter.post('/auth/otp/login', async (c) => {
       console.log('✅ [OTP LOGIN] SMS sent successfully');
     } catch (e) {
       console.error('❌ [OTP LOGIN] sendSMS failed:', e);
-      await prisma.otpCode.deleteMany({ 
-        where: { phone: normalizedPhone, code, purpose: 'login' } 
+      await otpCodes.deleteMany({ 
+        phone: normalizedPhone, code, purpose: 'login' 
       });
       return c.json({ error: 'ارسال پیامک ناموفق بود' }, 500 as any);
     }
@@ -143,16 +140,14 @@ otpRouter.post('/auth/otp/login/verify', async (c) => {
     console.log('📱 [OTP LOGIN VERIFY] Normalized phone:', normalizedPhone);
 
     // Find valid OTP
-    const otp = await prisma.otpCode.findFirst({
-      where: { 
-        phone: normalizedPhone, 
-        purpose: 'login', 
-        code, 
-        expiresAt: { gt: new Date() }, 
-        isUsed: false 
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const { otpCodes, users } = await getCollections();
+    const otp = await otpCodes.findOne({
+      phone: normalizedPhone, 
+      purpose: 'login', 
+      code, 
+      expiresAt: { $gt: new Date() }, 
+      isUsed: false 
+    }, { sort: { createdAt: -1 } });
 
     if (!otp) {
       console.log('❌ [OTP LOGIN VERIFY] No valid OTP found for:', normalizedPhone);
@@ -161,58 +156,42 @@ otpRouter.post('/auth/otp/login/verify', async (c) => {
 
     // Check attempts limit
     if (otp.attempts >= 3) {
-      console.log('❌ [OTP LOGIN VERIFY] Too many attempts for OTP:', otp.id);
+      console.log('❌ [OTP LOGIN VERIFY] Too many attempts for OTP:', otp._id);
       return c.json({ 
         error: 'تعداد تلاش‌ها بیش از حد مجاز. لطفاً کد جدید درخواست دهید' 
       }, 429 as any);
     }
 
     // Find user
-    const user = await prisma.user.findFirst({ 
-      where: { phone: normalizedPhone },
-      select: { 
-        id: true, 
-        name: true, 
-        phone: true, 
-        role: true, 
-        status: true,
-        grade: true,
-        field: true,
-        city: true,
-        isVerified: true
-      }
-    });
+    const user = await users.findOne({ phone: normalizedPhone });
 
     if (!user) {
       console.log('❌ [OTP LOGIN VERIFY] User not found for phone:', normalizedPhone);
       return c.json({ error: 'کاربر یافت نشد' }, 404 as any);
     }
     
-    console.log('✅ [OTP LOGIN VERIFY] User found:', { id: user.id, name: user.name, role: user.role, status: user.status });
+    console.log('✅ [OTP LOGIN VERIFY] User found:', { id: user._id, name: user.name, role: user.role, status: user.status });
 
     if (user.status === 'SUSPENDED') {
-      console.log('❌ [OTP LOGIN VERIFY] User suspended:', user.id);
+      console.log('❌ [OTP LOGIN VERIFY] User suspended:', user._id);
       return c.json({ 
         error: 'حساب کاربری شما مسدود شده است' 
       }, 403 as any);
     }
 
     // Mark OTP as used
-    await prisma.otpCode.update({ 
-      where: { id: otp.id }, 
-      data: { isUsed: true } 
-    });
+    await otpCodes.updateOne({ _id: otp._id }, { $set: { isUsed: true } });
 
     // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() }
-    });
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { lastLogin: new Date() } }
+    );
 
     // Create session token
     try {
       const tokenPayload = {
-        sub: user.id,
+        sub: user._id.toString(),
         name: user.name ?? null,
         email: `${user.phone}@local.host`,
         role: user.role,
@@ -251,7 +230,7 @@ otpRouter.post('/auth/otp/login/verify', async (c) => {
       const cookieHeader = cookieOptions.join('; ');
 
       console.log('✅ [OTP LOGIN VERIFY] Session created:', {
-        userId: user.id,
+        userId: user._id,
         role: user.role,
         phone: user.phone,
       });
@@ -263,7 +242,7 @@ otpRouter.post('/auth/otp/login/verify', async (c) => {
         success: true,
         message: 'ورود با موفقیت انجام شد',
         user: {
-          id: user.id,
+          id: user._id,
           phone: user.phone,
           name: user.name,
           role: user.role,
@@ -286,7 +265,7 @@ otpRouter.post('/auth/otp/login/verify', async (c) => {
         success: true,
         message: 'ورود با موفقیت انجام شد',
         user: {
-          id: user.id,
+          id: user._id,
           phone: user.phone,
           name: user.name,
           role: user.role,
@@ -347,7 +326,8 @@ otpRouter.post('/auth/otp/send', async (c) => {
     // Check if user already exists
     console.log('🔍 [OTP DIRECT] Checking if user already exists...');
     try {
-      const existingUser = await prisma.user.findFirst({ where: { phone: normalizedPhone } });
+      const { users } = await getCollections();
+      const existingUser = await users.findOne({ phone: normalizedPhone });
       console.log('👤 [OTP DIRECT] Existing user check result:', existingUser ? 'User exists' : 'User not found');
       if (existingUser) {
         console.log('❌ [OTP DIRECT] User already exists, returning error');
@@ -360,14 +340,17 @@ otpRouter.post('/auth/otp/send', async (c) => {
       console.warn('⚠️ [OTP DIRECT] Database check failed, continuing with mock mode:', dbError.message);
     }
 
+    // Get collections for database operations
+    const { otpCodes } = await getCollections();
+
     // Check for recent OTP requests
     console.log('⏰ [OTP DIRECT] Checking for recent OTP requests...');
     let recent: any = null;
     try {
-      recent = await prisma.otpCode.findFirst({
-        where: { phone: normalizedPhone, createdAt: { gte: new Date(Date.now() - 120_000) } },
-        orderBy: { createdAt: 'desc' }
-      });
+      recent = await otpCodes.findOne({
+        phone: normalizedPhone, 
+        createdAt: { $gte: new Date(Date.now() - 120_000) }
+      }, { sort: { createdAt: -1 } });
       console.log('📅 [OTP DIRECT] Recent OTP check result:', recent ? 'Found recent request' : 'No recent requests');
     } catch (dbError) {
       console.warn('⚠️ [OTP DIRECT] Database resend check failed, continuing:', dbError.message);
@@ -386,15 +369,16 @@ otpRouter.post('/auth/otp/send', async (c) => {
     
     // Store OTP code in database
     console.log('💾 [OTP DIRECT] Storing OTP code in database...');
-    const storedOtp = await prisma.otpCode.create({ 
-      data: { 
-        phone: normalizedPhone, 
-        code, 
-        purpose: 'signup', 
-        expiresAt 
-      } 
+    const storedOtp = await otpCodes.insertOne({ 
+      phone: normalizedPhone, 
+      code, 
+      purpose: 'signup', 
+      expiresAt,
+      isUsed: false,
+      attempts: 0,
+      createdAt: new Date()
     });
-    console.log('✅ [OTP DIRECT] OTP code stored successfully with ID:', storedOtp.id);
+    console.log('✅ [OTP DIRECT] OTP code stored successfully with ID:', storedOtp.insertedId);
 
     console.log('📱 [OTP DIRECT] Attempting to send SMS...');
     try {
@@ -411,7 +395,7 @@ otpRouter.post('/auth/otp/send', async (c) => {
       console.error('❌ [OTP DIRECT] sendSMS failed:', e);
       console.log('🧹 [OTP DIRECT] Attempting database cleanup...');
       try {
-        await prisma.otpCode.deleteMany({ where: { phone: normalizedPhone, code, purpose: 'signup' } });
+        await otpCodes.deleteMany({ phone: normalizedPhone, code, purpose: 'signup' });
         console.log('✅ [OTP DIRECT] Database cleanup successful');
       } catch (dbError) {
         console.warn('⚠️ [OTP DIRECT] Database cleanup failed:', dbError.message);
@@ -466,16 +450,14 @@ otpRouter.post('/auth/otp/verify', async (c) => {
 
     console.log('🔍 [OTP VERIFY] Looking for OTP record...');
     try {
-      const otpRecord = await prisma.otpCode.findFirst({
-        where: {
-          phone: normalizedPhone,
-          code: rawCode,
-          purpose: 'signup',
-          expiresAt: { gt: new Date() },
-          isUsed: false,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const { otpCodes } = await getCollections();
+      const otpRecord = await otpCodes.findOne({
+        phone: normalizedPhone,
+        code: rawCode,
+        purpose: 'signup',
+        expiresAt: { $gt: new Date() },
+        isUsed: false,
+      }, { sort: { createdAt: -1 } });
 
       if (!otpRecord) {
         console.log('❌ [OTP VERIFY] Invalid or expired OTP');
@@ -483,10 +465,10 @@ otpRouter.post('/auth/otp/verify', async (c) => {
       }
 
       console.log('✅ [OTP VERIFY] Valid OTP found, marking as used...');
-      await prisma.otpCode.update({
-        where: { id: otpRecord.id },
-        data: { isUsed: true }
-      });
+      await otpCodes.updateOne(
+        { _id: otpRecord._id },
+        { $set: { isUsed: true } }
+      );
 
       console.log('🎉 [OTP VERIFY] OTP verified successfully!');
       return c.json({
@@ -564,16 +546,14 @@ otpRouter.post('/auth/complete-registration', async (c) => {
     // Step 1: Verify OTP
     console.log('🔍 [COMPLETE REGISTRATION] Verifying OTP...');
     try {
-      const validOtp = await prisma.otpCode.findFirst({
-        where: {
-          phone: normalizedPhone,
-          code: String(otpCode),
-          purpose: 'signup',
-          expiresAt: { gt: new Date() },
-          isUsed: false,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const { otpCodes, users } = await getCollections();
+      const validOtp = await otpCodes.findOne({
+        phone: normalizedPhone,
+        code: String(otpCode),
+        purpose: 'signup',
+        expiresAt: { $gt: new Date() },
+        isUsed: false,
+      }, { sort: { createdAt: -1 } });
 
       if (!validOtp) {
         console.log('❌ [COMPLETE REGISTRATION] Invalid or expired OTP');
@@ -592,9 +572,7 @@ otpRouter.post('/auth/complete-registration', async (c) => {
 
       // Step 2: Check if user already exists
       console.log('🔍 [COMPLETE REGISTRATION] Checking if user already exists...');
-      const existingUser = await prisma.user.findFirst({
-        where: { phone: normalizedPhone },
-      });
+      const existingUser = await users.findOne({ phone: normalizedPhone });
 
       if (existingUser) {
         console.log('❌ [COMPLETE REGISTRATION] User already exists');
@@ -609,36 +587,36 @@ otpRouter.post('/auth/complete-registration', async (c) => {
 
       // Step 4: Create new user
       console.log('👤 [COMPLETE REGISTRATION] Creating new user...');
-      const newUser = await prisma.user.create({
-        data: {
-          phone: normalizedPhone,
-          name: String(name).trim(),
-          password: hashedPassword,
-          role: 'STUDENT',
-          grade: grade ? String(grade).trim() : null,
-          field: field ? String(field).trim() : null,
-          city: city ? String(city).trim() : (province ? String(province).trim() : null),
-          phoneVerifiedAt: new Date(),
-          isVerified: true,
-          status: 'ACTIVE',
-          lastLogin: new Date(),
-        },
+      const newUser = await users.insertOne({
+        phone: normalizedPhone,
+        name: String(name).trim(),
+        password: hashedPassword,
+        role: 'STUDENT',
+        grade: grade ? String(grade).trim() : null,
+        field: field ? String(field).trim() : null,
+        city: city ? String(city).trim() : (province ? String(province).trim() : null),
+        phoneVerifiedAt: new Date(),
+        isVerified: true,
+        status: 'ACTIVE',
+        lastLogin: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
-      console.log('✅ [COMPLETE REGISTRATION] User created successfully:', newUser.id);
+      console.log('✅ [COMPLETE REGISTRATION] User created successfully:', newUser.insertedId);
 
       // Step 5: Mark OTP as used
       console.log('🏷️ [COMPLETE REGISTRATION] Marking OTP as used...');
-      await prisma.otpCode.update({
-        where: { id: validOtp.id },
-        data: { isUsed: true },
-      });
+      await otpCodes.updateOne(
+        { _id: validOtp._id },
+        { $set: { isUsed: true } }
+      );
 
       // Step 6: Auto-login by issuing Auth.js-compatible session cookie
       console.log('🍪 [COMPLETE REGISTRATION] Creating session cookie...');
       try {
         const tokenPayload = {
-          sub: newUser.id,
+          sub: newUser.insertedId.toString(),
           name: newUser.name ?? null,
           email: `${newUser.phone}@local.host`,
           role: newUser.role,
@@ -677,7 +655,7 @@ otpRouter.post('/auth/complete-registration', async (c) => {
           success: true,
           message: 'ثبت‌نام با موفقیت انجام شد و شما به صورت خودکار وارد شدید.',
           user: {
-            id: newUser.id,
+            id: newUser.insertedId,
             phone: newUser.phone,
             name: newUser.name,
             role: newUser.role,
@@ -701,7 +679,7 @@ otpRouter.post('/auth/complete-registration', async (c) => {
           success: true,
           message: 'ثبت‌نام با موفقیت انجام شد. لطفاً وارد شوید.',
           user: {
-            id: newUser.id,
+            id: newUser.insertedId,
             phone: newUser.phone,
             name: newUser.name,
             role: newUser.role,

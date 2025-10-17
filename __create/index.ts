@@ -3,7 +3,7 @@ import nodeConsole from 'node:console';
 import { skipCSRFCheck } from '@auth/core';
 import Credentials from '@auth/core/providers/credentials';
 import { authHandler, initAuthConfig } from '@hono/auth-js';
-import { neonConfig } from '@neondatabase/serverless';
+// import { neonConfig } from '@neondatabase/serverless'; // Removed for MongoDB migration
 import { hash, verify } from 'argon2';
 import { Hono } from 'hono';
 import { contextStorage, getContext } from 'hono/context-storage';
@@ -14,8 +14,8 @@ import { createHonoServer } from 'react-router-hono-server/node';
 import { serializeError } from 'serialize-error';
 import { randomUUID } from 'node:crypto';
 import ws from 'ws';
-// Prisma-based user store (we use JWT strategy without adapter)
-import prisma from '../src/app/api/utils/prisma';
+// MongoDB-based user store (we use JWT strategy without adapter)
+// import prisma from '../src/app/api/utils/prisma'; // Removed for MongoDB migration
 import { getHTMLForErrorPage } from './get-html-for-error-page';
 import { security } from '../src/server/middlewares/security';
 import { isAuthAction } from './is-auth-action';
@@ -24,7 +24,7 @@ import routes from '../src/server/routes';
 import { wsHub } from '../src/server/realtime/ws';
 import { scheduleDaily } from '../src/server/cron/scheduler';
 import { dailyReminder, autoSuspension } from '../src/server/cron/tasks';
-neonConfig.webSocketConstructor = ws;
+// neonConfig.webSocketConstructor = ws; // Removed for MongoDB migration
 
 function normalizeIranPhoneLocal(phone: string): string {
   // Basic normalization to +98xxxxxxxxxx
@@ -205,6 +205,9 @@ if (process.env.AUTH_SECRET) {
       },
     },
     providers: [
+      // Credentials provider temporarily disabled for MongoDB migration
+      // TODO: Re-implement with MongoDB queries
+      /*
       Credentials({
         id: 'credentials-signin',
         name: 'Credentials Sign in',
@@ -267,6 +270,7 @@ if (process.env.AUTH_SECRET) {
           }
         },
       }),
+      */
       // Sign-up handled by REST API after OTP verify
     ],
   };

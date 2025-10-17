@@ -1,6 +1,6 @@
-import prisma from "@/app/api/utils/prisma";
+// import prisma from "@/app/api/utils/prisma"; // Removed for MongoDB migration
 import { hash as argonHash } from "argon2";
-import { Prisma } from "@prisma/client";
+// import { Prisma } from "@prisma/client"; // Removed for MongoDB migration
 
 /**
  * API Route: Create/Update Admin Advisor Account
@@ -13,6 +13,10 @@ import { Prisma } from "@prisma/client";
  * - DEFAULT_ADVISOR_PASSWORD: رمز عبور پیش‌فرض برای حساب ادمین
  */
 export async function POST(request) {
+  // TODO: Re-implement with MongoDB
+  return Response.json({ error: "This endpoint is temporarily disabled during MongoDB migration" }, { status: 503 });
+  
+  /*
   try {
     // Step 1: Security check - Verify admin secret header
     const providedSecret = request.headers.get("x-admin-secret");
@@ -177,4 +181,5 @@ export async function POST(request) {
       code: 'INTERNAL_ERROR',
     }, { status: 500 });
   }
+  */
 }

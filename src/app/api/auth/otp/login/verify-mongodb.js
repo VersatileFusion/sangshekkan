@@ -4,7 +4,7 @@ import { normalizeIranPhone } from "@/app/api/utils/sms";
 import { encode as encodeJwt } from "@auth/core/jwt";
 
 /**
- * OTP Login Verification - Verify OTP and login user
+ * OTP Login Verification - Verify OTP and login user (MongoDB version)
  */
 export async function POST(request) {
   try {
@@ -42,6 +42,7 @@ export async function POST(request) {
 
     // Check attempts limit
     if (otp.attempts >= 3) {
+      console.log('[OTP Login Verify] Too many attempts for OTP:', otp._id);
       return Response.json({ 
         error: 'تعداد تلاش‌ها بیش از حد مجاز. لطفاً کد جدید درخواست دهید' 
       }, { status: 429 });
@@ -55,9 +56,10 @@ export async function POST(request) {
       return Response.json({ error: 'کاربر یافت نشد' }, { status: 404 });
     }
     
-    console.log('[OTP Login Verify] User found:', { id: user._id, name: user.name, role: user.role, status: user.status });
+    console.log('✅ [OTP Login Verify] User found:', { id: user._id, name: user.name, role: user.role, status: user.status });
 
     if (user.status === 'SUSPENDED') {
+      console.log('❌ [OTP Login Verify] User suspended:', user._id);
       return Response.json({ 
         error: 'حساب کاربری شما مسدود شده است' 
       }, { status: 403 });
@@ -111,8 +113,8 @@ export async function POST(request) {
 
       const cookieHeader = cookieOptions.join('; ');
 
-      console.log('[OTP Login] Session created:', {
-        userId: user.id,
+      console.log('✅ [OTP Login Verify] Session created:', {
+        userId: user._id,
         role: user.role,
         phone: user.phone,
       });
@@ -142,7 +144,7 @@ export async function POST(request) {
         },
       });
     } catch (e) {
-      console.error('[OTP Login] Cookie creation failed:', e?.message || e);
+      console.error('❌ [OTP Login Verify] Cookie creation failed:', e?.message || e);
       return Response.json({
         success: true,
         message: 'ورود با موفقیت انجام شد',
@@ -162,7 +164,7 @@ export async function POST(request) {
     }
 
   } catch (error) {
-    console.error('OTP Login Verify error:', error);
+    console.error('❌ [OTP Login Verify] Error:', error);
     return Response.json({ error: 'خطای سرور' }, { status: 500 });
   }
 }

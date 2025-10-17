@@ -1,4 +1,4 @@
-import prisma from "@/app/api/utils/prisma";
+import { getCollections } from "@/app/api/utils/mongodb";
 import { verify as argonVerify } from "argon2";
 import { normalizeIranPhone } from "@/app/api/utils/sms";
 import { encode as encodeJwt } from "@auth/core/jwt";
@@ -35,10 +35,11 @@ export async function POST(request) {
     }
 
     const phones = normalizeCandidates(identifier);
+    const { users } = await getCollections();
 
     // Find by phone (schema has no email field)
-    const user = await prisma.user.findFirst({
-      where: { OR: phones.map((p) => ({ phone: p })) },
+    const user = await users.findOne({
+      phone: { $in: phones }
     });
 
     if (!user) {
@@ -53,7 +54,7 @@ export async function POST(request) {
     // Create Auth.js-compatible JWT session token and set cookie
     const now = Math.floor(Date.now() / 1000);
     const tokenPayload = {
-      sub: user.id,
+      sub: user._id.toString(),
       name: user.name ?? null,
       email: `${user.phone}@local.host`,
       role: user.role,
@@ -91,7 +92,7 @@ export async function POST(request) {
     return new Response(
       JSON.stringify({
         success: true,
-        user: { id: user.id, phone: user.phone, name: user.name ?? null, role: user.role },
+        user: { id: user._id, phone: user.phone, name: user.name ?? null, role: user.role },
         nextUrl,
       }),
       {

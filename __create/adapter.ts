@@ -5,7 +5,7 @@ import type {
 	AdapterSession,
 } from '@auth/core/adapters';
 import type { ProviderType } from '@auth/core/providers';
-import type { Pool } from '@neondatabase/serverless';
+// import type { Pool } from '@neondatabase/serverless'; // Removed for MongoDB migration
 
 interface NeonUser extends AdapterUser {
 	accounts: {
@@ -39,7 +39,7 @@ interface NeonAdapter extends Adapter {
 	}): Promise<void>;
 }
 
-export default function NeonAdapter(client: Pool): NeonAdapter {
+export default function NeonAdapter(client: any): NeonAdapter {
 	return {
 		async createVerificationToken(
 			verificationToken: VerificationToken
