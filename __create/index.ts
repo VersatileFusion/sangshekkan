@@ -103,7 +103,7 @@ app.use('*', (c, next) => {
     }
     process.env.__ENV_HEALTH_LOGGED = '1';
   }
-  const requestId = c.get('requestId');
+  const requestId = c.req.header('x-request-id') || randomUUID();
   return als.run({ requestId }, () => next());
 });
 
@@ -113,7 +113,7 @@ app.use(contextStorage());
 app.onError((err, c) => {
   const explicitStatus = (err as any)?.status;
   const status = typeof explicitStatus === 'number' && explicitStatus >= 400 && explicitStatus <= 599 ? explicitStatus : 500;
-  const reqId = c.get('requestId') || randomUUID();
+  const reqId = c.req.header('x-request-id') || randomUUID();
   const isInternal = status >= 500;
   const body = {
     error: {
@@ -325,7 +325,7 @@ console.log('✅ [SERVER] Route-builder API routes mounted');
 
 // Fallback NOT_FOUND for any unmatched /api/* route
 app.all('/api/*', (c) => {
-  const reqId = c.get('requestId') || randomUUID();
+  const reqId = c.req.header('x-request-id') || randomUUID();
   return c.json(
     {
       error: { code: 'NOT_FOUND', message: 'Route not found', details: null },
