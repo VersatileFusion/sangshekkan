@@ -3,12 +3,12 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "react-router dev",
-		"build": "react-router build",
+		"dev": "npx react-router dev",
+		"build": "npx react-router build",
 		"start": "node index.js",
 		"postinstall": "prisma generate",
 		"e2e:otp": "node ./scripts/e2e-otp-signup.js",
-		"typecheck": "react-router typegen && tsc --noEmit",
+		"typecheck": "npx react-router typegen && tsc --noEmit",
 		"seed": "node prisma/seed.js"
 	},
 	"dependencies": {
