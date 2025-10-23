@@ -347,6 +347,8 @@ process.on('uncaughtException', (error) => {
 const serverPromise = createHonoServer({
   app,
   defaultLogger: false,
+  // Ensure React Router handles API routes
+  getLoadContext: () => ({}),
 });
 
 serverPromise
