@@ -4,9 +4,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "npx react-router dev",
-		"build": "npx react-router build",
+		"build": "prisma generate && npx react-router build",
 		"start": "node index.js",
-		"postinstall": "prisma generate",
 		"e2e:otp": "node ./scripts/e2e-otp-signup.js",
 		"typecheck": "npx react-router typegen && tsc --noEmit",
 		"seed": "node prisma/seed.js"

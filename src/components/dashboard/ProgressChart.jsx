@@ -1,21 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { TrendingUp } from "lucide-react";
 import { toPersianDate } from "@/utils/dateConverter";
+
+// Lazy load the heavy chart components
+const LazyChart = lazy(() => import("./LazyChart"));
 
 export default function ProgressChart({ reports }) {
   const [chartType, setChartType] = useState("line");
@@ -59,77 +49,15 @@ export default function ProgressChart({ reports }) {
     );
   }, [reports, dateRange]);
 
-  const ChartComponent = {
-    line: LineChart,
-    bar: BarChart,
-    area: AreaChart,
-  }[chartType];
-
-  const ChartContent = () => {
-    switch (chartType) {
-      case "line":
-        return (
-          <>
-            <Line
-              type="monotone"
-              dataKey="study_hours"
-              stroke="#06b6d4"
-              strokeWidth={3}
-              dot={{ fill: "#06b6d4", strokeWidth: 2, r: 5 }}
-              activeDot={{ r: 8, fill: "#0891b2" }}
-            />
-            <Line
-              type="monotone"
-              dataKey="test_count"
-              stroke="#f59e0b"
-              strokeWidth={3}
-              dot={{ fill: "#f59e0b", strokeWidth: 2, r: 5 }}
-              activeDot={{ r: 8, fill: "#d97706" }}
-            />
-            {chartData.some((d) => d.ghalamchi_score) && (
-              <Line
-                type="monotone"
-                dataKey="ghalamchi_score"
-                stroke="#8b5cf6"
-                strokeWidth={3}
-                dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 5 }}
-                activeDot={{ r: 8, fill: "#7c3aed" }}
-              />
-            )}
-          </>
-        );
-      case "bar":
-        return (
-          <>
-            <Bar dataKey="study_hours" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="test_count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-          </>
-        );
-      case "area":
-        return (
-          <>
-            <Area
-              type="monotone"
-              dataKey="study_hours"
-              stackId="1"
-              stroke="#06b6d4"
-              fill="#06b6d4"
-              fillOpacity={0.6}
-            />
-            <Area
-              type="monotone"
-              dataKey="test_count"
-              stackId="1"
-              stroke="#f59e0b"
-              fill="#f59e0b"
-              fillOpacity={0.6}
-            />
-          </>
-        );
-      default:
-        return null;
-    }
-  };
+  // Loading component for charts
+  const ChartLoading = () => (
+    <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>
+        <p className="text-gray-600">در حال بارگذاری نمودار...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-gray-100">
@@ -177,35 +105,9 @@ export default function ProgressChart({ reports }) {
             </div>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <ChartComponent data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-              <XAxis
-                dataKey="persianDate"
-                tick={{ fontSize: 12 }}
-                stroke="#6b7280"
-              />
-              <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" />
-              <Tooltip
-                labelFormatter={(label) => `📅 ${label}`}
-                formatter={(value, name) => [
-                  typeof value === "number" ? value.toFixed(1) : value,
-                  name === "study_hours"
-                    ? "⏰ ساعت مطالعه"
-                    : name === "test_count"
-                      ? "📚 تعداد تست"
-                      : "🏆 تراز قلمچی",
-                ]}
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
-                }}
-              />
-              <ChartContent />
-            </ChartComponent>
-          </ResponsiveContainer>
+          <Suspense fallback={<ChartLoading />}>
+            <LazyChart chartType={chartType} chartData={chartData} />
+          </Suspense>
         )}
       </div>
     </div>
