@@ -345,6 +345,10 @@ const serverPromise = createHonoServer({
   defaultLogger: false,
   // Ensure React Router handles API routes
   getLoadContext: () => ({}),
+  // Don't create server automatically in production
+  onServe: (server) => {
+    console.log(`🚀 Server running on port ${process.env.PORT || 3000}`);
+  },
 });
 
 serverPromise
