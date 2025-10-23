@@ -19,7 +19,7 @@ server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${port} is already in use. Trying port ${port + 1}`);
     // Try next port
-    const newPort = port + 1;
+    const newPort = parseInt(port) + 1;
     serve({
       fetch: app.fetch,
       port: newPort,

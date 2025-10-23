@@ -22,7 +22,6 @@ import ws from 'ws';
 import { getHTMLForErrorPage } from './get-html-for-error-page';
 import { security } from '../src/server/middlewares/security';
 import { isAuthAction } from './is-auth-action';
-import { API_BASENAME, api } from './route-builder';
 import routes from '../src/server/routes';
 import { wsHub } from '../src/server/realtime/ws';
 import { scheduleDaily } from '../src/server/cron/scheduler';
@@ -317,11 +316,8 @@ console.log('🔧 [SERVER] Mounting server routes...');
 app.route('/api', routes);
 console.log('✅ [SERVER] Server routes mounted');
 
-// Handle legacy generated API routes (already include '/api' in their own paths)
-console.log('🔧 [SERVER] Mounting route-builder API routes...');
-console.log('🔧 [SERVER] API routes count:', api.routes.length);
-app.route('/', api);
-console.log('✅ [SERVER] Route-builder API routes mounted');
+// API routes are handled by React Router, no need for custom route builder
+console.log('🔧 [SERVER] API routes handled by React Router');
 
 // Fallback NOT_FOUND for any unmatched /api/* route
 app.all('/api/*', (c) => {
