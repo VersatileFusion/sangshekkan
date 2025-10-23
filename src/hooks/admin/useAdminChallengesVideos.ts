@@ -10,7 +10,7 @@ export function useAdminChallenges(page: number = 1) {
       if (!res.ok) throw new Error('Failed to load challenges');
       return res.json();
     },
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   });
 }
 
@@ -83,7 +83,7 @@ export function useAdminVideos(page: number = 1, category?: string) {
       if (!res.ok) throw new Error('Failed to load videos');
       return res.json();
     },
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   });
 }
 

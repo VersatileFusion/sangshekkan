@@ -12,7 +12,7 @@ export function useAdminReports(params: { studentId?: string; status?: 'PENDING'
       if (!res.ok) throw new Error('Failed to load reports');
       return res.json();
     },
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   });
 }
 

@@ -8,7 +8,7 @@ export function useAdminStudents(page: number) {
       if (!res.ok) throw new Error('Failed to load students');
       return res.json();
     },
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   });
 }
 

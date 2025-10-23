@@ -41,7 +41,7 @@ export default function ReportSubmissionForm() {
     if (file) {
       const res = await upload.mutateAsync(file);
       fileKey = res.fileKey;
-      fileUrl = res.fileUrl; // دریافت fileUrl از آپلود محلی
+      fileUrl = (res as any).fileUrl; // دریافت fileUrl از آپلود محلی
     }
     await createReport.mutateAsync({
       date: values.date,
